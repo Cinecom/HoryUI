@@ -6,6 +6,9 @@
 # Internal development / design guide (not a runtime addon file).
 CLAUDE.md
 
+# Dev-only tooling (audit scripts etc.) — never shipped to the client.
+dev/
+
 # OS / editor cruft
 Thumbs.db
 .DS_Store

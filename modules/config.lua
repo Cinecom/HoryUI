@@ -37,7 +37,7 @@ HoryUI:RegisterModule("config", true, function()
   brandSub:SetText("settings")
   brandSub:SetTextColor(C.text3[1], C.text3[2], C.text3[3])
 
-  local ver = (GetAddOnMetadata and GetAddOnMetadata("HoryUI", "Version")) or HoryUI.version
+  local ver = (GetAddOnMetadata and GetAddOnMetadata("!HoryUI", "Version")) or HoryUI.version
   local hver = win:CreateFontString(nil, "OVERLAY")
   HoryUI.SetFont(hver, HoryUI.font.number, 10, "OUTLINE")
   hver:SetPoint("TOPRIGHT", win, "TOPRIGHT", -30, -13)
@@ -101,8 +101,8 @@ HoryUI:RegisterModule("config", true, function()
   local navMods    = MakeNav("Modules", "modules", -70)
   local navAddons  = MakeNav("Addons",  "addons",  -98)
   local navPfui    = MakeNav("PfUI",    "pfui",    -126)
-  local navLoad    = MakeNav("Load Times", "loadtimes", -154)
-  local navAbars   = MakeNav("Actionbars", "actionbars", -182)
+  local navAbars   = MakeNav("Actionbars", "actionbars", -154)
+  local navLoad    = MakeNav("Load Times", "loadtimes", -182)
 
   local function HLNav(b, active)
     b.active = active
@@ -202,7 +202,7 @@ HoryUI:RegisterModule("config", true, function()
   hpHdr:SetPoint("TOPLEFT", general, "TOPLEFT", 2, -104)
   hpHdr:SetText("Profiles")
   hpHdr:SetTextColor(C.accent_hi[1], C.accent_hi[2], C.accent_hi[3])
-  Desc("Save / load the whole HoryUI setup (panel positions, modules, action bars).", hpHdr, -4)
+  Desc("Save / load the whole HoryUI setup.", hpHdr, -4)
 
   local hpName = CreateFrame("EditBox", nil, general)
   hpName:SetWidth(150); hpName:SetHeight(18)
@@ -353,10 +353,9 @@ HoryUI:RegisterModule("config", true, function()
   -- =========================================================================
   -- content : Load Times  (per-addon startup file-load cost, ms)
   -- =========================================================================
-  -- Data comes from the companion addon "!HoryUILoadTimer": it loads first and
-  -- records debugprofilestop() at each ADDON_LOADED, so it can time every addon
-  -- (HoryUI loads too late to see the ones before it). We only READ its globals --
-  -- if it isn't loaded we say so rather than invent numbers.
+  -- Data comes from core\loadtimer.lua (built in): !HoryUI loads first and records
+  -- debugprofilestop() at each ADDON_LOADED, so it can time every addon. We only
+  -- READ its globals here -- if they're missing we say so rather than invent numbers.
   local loadtab = CreateFrame("Frame", nil, win)
   loadtab:SetPoint("TOPLEFT", win, "TOPLEFT", 132, -44)
   loadtab:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 42)
@@ -412,7 +411,7 @@ HoryUI:RegisterModule("config", true, function()
       return
     end
     if not src or getn(src) == 0 then
-      loadMsg:SetText("Companion addon \"!HoryUILoadTimer\" isn't loaded. Enable it in the Addons list (it must load first to time every addon), then Reload & Measure.")
+      loadMsg:SetText("No load-time data yet. Make sure the addon folder is named \"!HoryUI\" so it loads first, then Reload & Measure.")
       loadMsg:Show(); loadSum:SetText(""); loadList.SetTotal(0)
       return
     end
@@ -557,6 +556,22 @@ HoryUI:RegisterModule("config", true, function()
     ShowUIPanel(ColorPickerFrame)
   end)
 
+  -- Hover-to-bind keybind mode (Bongos hoverbind). Closes the settings window so
+  -- the bars are clickable, then shows the keybind overlay over every button.
+  local kbBtn = HoryUI.CreateButton(pGlobal, "Enter keybind mode", function()
+    if not Bongos_ToggleKeyBindMode then return end
+    win:Hide()
+    Bongos_ToggleKeyBindMode()
+  end)
+  kbBtn:SetWidth(150)
+  kbBtn:SetPoint("TOPLEFT", pGlobal, "TOPLEFT", 0, -150)
+  local kbNote = pGlobal:CreateFontString(nil, "OVERLAY")
+  HoryUI.SetFont(kbNote, HoryUI.font.normal, 10, "OUTLINE")
+  kbNote:SetPoint("TOPLEFT", kbBtn, "BOTTOMLEFT", 0, -4)
+  kbNote:SetWidth(260); kbNote:SetJustifyH("LEFT")
+  kbNote:SetText("Hover a button and press a key to bind it. Esc on a button clears it; Esc on empty space exits.")
+  kbNote:SetTextColor(C.text3[1], C.text3[2], C.text3[3])
+
   local function RefreshGlobal()
     for i = 1, getn(gCheckObjs) do gCheckObjs[i].Refresh() end
     scDD.SetValue(BActionSets_GetSelfCastMode() or 0)
@@ -642,7 +657,7 @@ HoryUI:RegisterModule("config", true, function()
   fdiv:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 12, 34)
   fdiv:SetPoint("BOTTOMRIGHT", win, "BOTTOMRIGHT", -12, 34)
 
-  local auth = (GetAddOnMetadata and GetAddOnMetadata("HoryUI", "Author")) or "Horyoshi"
+  local auth = (GetAddOnMetadata and GetAddOnMetadata("!HoryUI", "Author")) or "Horyoshi"
   local footer = win:CreateFontString(nil, "OVERLAY")
   HoryUI.SetFont(footer, HoryUI.font.normal, 10, "OUTLINE")
   footer:SetPoint("BOTTOMLEFT", win, "BOTTOMLEFT", 14, 12)

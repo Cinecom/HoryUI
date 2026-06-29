@@ -51,7 +51,7 @@ pfSkin.movables     = {}   -- used by Update/RemoveMovable (miscellaneous, help 
 pfSkin.bootup       = true
 pfSkin.expansion    = "vanilla"
 pfSkin.client       = 11200
-pfSkin.path         = "Interface\\AddOns\\HoryUI\\pfskin"
+pfSkin.path         = "Interface\\AddOns\\!HoryUI\\pfskin"
 pfSkin.version      = { string = "pfUI-skins (vendored)" }
 pfSkin.font_default = "Fonts\\FRIZQT__.TTF"
 pfSkin.font_unit    = "Fonts\\FRIZQT__.TTF"   -- nameplates: used when C.nameplates.use_unitfonts == "1"
@@ -189,7 +189,7 @@ pfSkin:SetScript("OnEvent", function()
   end
 
   if event == "ADDON_LOADED" then
-    if arg1 == "HoryUI" and pfSkin.LoadConfig and not pfSkin.configured then
+    if arg1 == "!HoryUI" and pfSkin.LoadConfig and not pfSkin.configured then
       pfSkin.configured = true
       pfSkin:LoadConfig()
     end
