@@ -231,21 +231,32 @@ HoryUI:RegisterModule("auras", true, function()
   ----------------------------------------------------------------------------
   local function ScanPlayerBuffs(icons)
     local total = table.getn(icons)
+    -- profession tracking (Find Herbs / Find Minerals / ...) shows up as a player
+    -- buff whose icon == the active tracking texture; skip it so the bar isn't
+    -- cluttered with a permanent tracking aura. Nil when nothing is tracked.
+    local track = GetTrackingTexture and GetTrackingTexture()
     local shown = 0
-    for i = 1, total do
+    local i = 1
+    while shown < total do
       local bid = GetPlayerBuff(BSTART + i, "HELPFUL")
       if not bid or bid < 0 then break end       -- buffs are contiguous from 1
-      shown = shown + 1
-      local ic = icons[shown]
-      ic.bidx = i
-      ic.tex:SetTexture(GetPlayerBuffTexture(bid) or "Interface\\Icons\\INV_Misc_QuestionMark")
-      local st = GetPlayerBuffApplications(bid)
-      if st and st > 1 then ic.count:SetText(st) else ic.count:SetText("") end
-      local tl = GetPlayerBuffTimeLeft(bid)
-      if tl and tl > 0 then SetTimer(ic.timer, tl) else ic.timer:SetText("") end
-      ic:Show()
+      local tex = GetPlayerBuffTexture(bid)
+      if track and tex == track then
+        i = i + 1                                 -- a tracking buff: skip, keep scanning
+      else
+        shown = shown + 1
+        local ic = icons[shown]
+        ic.bidx = i                               -- real buff index (for tooltip + cancel)
+        ic.tex:SetTexture(tex or "Interface\\Icons\\INV_Misc_QuestionMark")
+        local st = GetPlayerBuffApplications(bid)
+        if st and st > 1 then ic.count:SetText(st) else ic.count:SetText("") end
+        local tl = GetPlayerBuffTimeLeft(bid)
+        if tl and tl > 0 then SetTimer(ic.timer, tl) else ic.timer:SetText("") end
+        ic:Show()
+        i = i + 1
+      end
     end
-    for i = shown + 1, total do icons[i]:Hide() end
+    for j = shown + 1, total do icons[j]:Hide() end
   end
 
   local function Placeholders(icons, n)

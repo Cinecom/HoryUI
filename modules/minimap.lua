@@ -68,13 +68,6 @@ HoryUI:RegisterModule("minimap", true, function()
     end
   end)
 
-  -- mail icon, top-left corner
-  if MiniMapMailFrame then
-    MiniMapMailFrame:SetParent(Minimap)
-    MiniMapMailFrame:ClearAllPoints()
-    MiniMapMailFrame:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 2, -2)
-  end
-
   -- consistent flat hover + tooltip for the tray controls
   local function ChromeTip(btn, tip)
     btn:SetScript("OnEnter", function()
@@ -123,6 +116,84 @@ HoryUI:RegisterModule("minimap", true, function()
   handle.line:SetPoint("CENTER", handle, "CENTER", 0, 0)
   handle.line:SetVertexColor(C.text2[1], C.text2[2], C.text2[3], 1)
 
+  -- =========================================================================
+  -- 3b. left-border icon column ---------------------------------------------
+  -- Blizzard's mail + profession-tracking (Find Herbs / Find Minerals / ...)
+  -- buttons get a fixed square home flush against the minimap's LEFT edge,
+  -- instead of being swept into the tray. The native art is round, so we
+  -- HIDE the native icon and rebuild it as a crisp square: our own texture,
+  -- fed the same image the native icon carries (the tracking icon changes
+  -- with the active spell, so we re-mirror it each pass). The native frame
+  -- is kept, sized to our square, only for its click + tooltip.
+  -- =========================================================================
+  local SIDE = 18                    -- square cell edge for a side icon (small)
+  local sideOrder = {                -- top-to-bottom; tracking is always shown,
+    { frame = "MiniMapTrackingFrame", icon = "MiniMapTrackingIcon" },
+    { frame = "MiniMapMailFrame",     icon = "MiniMapMailIcon"     },  -- mail only when present
+  }
+  local sideCells = {}
+
+  -- wipe every native texture off a side button (the gold border ring is on the
+  -- ARTWORK layer -- pfUI's tracking skin uses the same DisableDrawLayer trick;
+  -- it also catches button normal/highlight textures that :Hide() misses). Re-run
+  -- each pass because Blizzard re-asserts these on tracking/mail updates.
+  local artLayers = { "BACKGROUND", "BORDER", "ARTWORK", "OVERLAY", "HIGHLIGHT" }
+  local function StripNativeArt(f)
+    local frames = { f, f:GetChildren() }   -- the frame + its inner button(s)
+    for i = 1, getn(frames) do
+      local fr = frames[i]
+      if fr and fr.DisableDrawLayer then
+        for j = 1, getn(artLayers) do fr:DisableDrawLayer(artLayers[j]) end
+      end
+    end
+  end
+
+  local function LayoutSide()
+    local slot = 0
+    for i = 1, getn(sideOrder) do
+      local def = sideOrder[i]
+      local f = getglobal(def.frame)
+      if f and f:IsShown() then
+        slot = slot + 1
+        local cell = sideCells[slot]
+        if not cell then
+          cell = CreateFrame("Frame", nil, holder)
+          cell:SetWidth(SIDE); cell:SetHeight(SIDE)
+          cell:SetFrameStrata("LOW")
+          cell:SetFrameLevel(mlvl + 5)
+          HoryUI.CreateBackdrop(cell)
+          cell.icon = cell:CreateTexture(nil, "ARTWORK")
+          cell.icon:SetPoint("TOPLEFT", cell, "TOPLEFT", 2, -2)
+          cell.icon:SetPoint("BOTTOMRIGHT", cell, "BOTTOMRIGHT", -2, 2)
+          cell.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)   -- crop to a clean square
+          sideCells[slot] = cell
+        end
+        cell:ClearAllPoints()
+        cell:SetPoint("TOPRIGHT", holder, "TOPLEFT", -3, -(slot - 1) * (SIDE + GAP))
+        cell:Show()
+
+        -- rebuild: read the native icon's image into our square, then strip ALL
+        -- native art (border ring included) so only the crisp square shows
+        local nat = getglobal(def.icon)
+        if nat then
+          local tex = nat:GetTexture()
+          if tex then cell.icon:SetTexture(tex) end
+        end
+        StripNativeArt(f)
+
+        -- keep the native frame purely for its click + tooltip, overlaying the cell
+        if f:GetParent() ~= cell then
+          f:SetParent(cell)
+          f:SetFrameLevel(cell:GetFrameLevel() + 1)
+        end
+        f:SetScale(1)
+        f:ClearAllPoints()
+        f:SetAllPoints(cell)
+      end
+    end
+    for i = slot + 1, getn(sideCells) do sideCells[i]:Hide() end
+  end
+
   -- managed addon buttons + reusable cell frames
   local known, knownSet, cells = {}, {}, {}
 
@@ -131,7 +202,8 @@ HoryUI:RegisterModule("minimap", true, function()
     HoryUITrayButton = true,
     MinimapZoomIn = true, MinimapZoomOut = true, MinimapBorder = true,
     MiniMapWorldMapButton = true, MiniMapMailFrame = true, MinimapBackdrop = true,
-    MiniMapTracking = true, MiniMapTrackingButton = true, GameTimeFrame = true,
+    MiniMapTracking = true, MiniMapTrackingButton = true, MiniMapTrackingFrame = true,
+    GameTimeFrame = true,
     MiniMapBattlefieldFrame = true, MiniMapLFGFrame = true, MinimapPing = true,
     MiniMapVoiceChatFrame = true, MinimapZoneTextButton = true, MinimapToggleButton = true,
     MiniMapMeetingStoneFrame = true,
@@ -250,6 +322,7 @@ HoryUI:RegisterModule("minimap", true, function()
     discover()
     layout()
     RefreshDrawer()
+    LayoutSide()
   end
 
   handle:SetScript("OnClick", function()
