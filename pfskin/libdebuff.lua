@@ -1290,14 +1290,27 @@ if hasNampower then
         pfSkin.libdebuff_item_icons[casterGuid] = nil
       end
       
+      -- HoryUI hand-edit (re-apply after re-copy): enemy-cast latency compensation.
+      -- A SPELL_START_OTHER packet reaches us ~one network round-trip after the cast
+      -- began on the server, so an uncompensated plate castbar finishes late and the
+      -- spell lands before it fills. Shift the start back by our latency so the bar
+      -- reaches the end at the real last-interruptible moment (a Kick also needs the
+      -- round-trip to land -> full GetNetStats latency). OTHER casts only; the
+      -- player's own cast timing is left untouched.
+      local castStart = GetTime()
+      if event == "SPELL_START_OTHER" then
+        local _, _, lag = GetNetStats()
+        castStart = castStart - (lag or 0) / 1000
+      end
+
       pfSkin.libdebuff_casts[casterGuid] = {
         spellID = spellId,
         itemID = itemId and itemId > 0 and itemId or nil,
         spellName = spellName,
         icon = icon,
-        startTime = GetTime(),
+        startTime = castStart,
         duration = castTime and castTime / 1000 or 0,
-        endTime = castTime and (GetTime() + castTime / 1000) or nil,
+        endTime = castTime and (castStart + castTime / 1000) or nil,
         event = isChannel and "CHANNEL" or "START"
       }
 

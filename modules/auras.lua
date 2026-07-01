@@ -6,11 +6,12 @@
 -- events (arg8 = ms), so any aura we witnessed being applied shows a real
 -- countdown; auras already active before we saw the unit show no timer.
 --
--- Player buffs instead use the Blizzard player-buff API (GetPlayerBuff /
--- GetPlayerBuffTexture / GetPlayerBuffApplications / GetPlayerBuffTimeLeft /
--- CancelPlayerBuff). Nampower's GetUnitField exposes no duration, and we want a
--- countdown timer + a right-click cancel; these are direct API calls, not the
--- tooltip scans CLAUDE.md sec.3 forbids.
+-- Player buffs AND player debuffs instead use the Blizzard player-buff API
+-- (GetPlayerBuff with the HELPFUL / HARMFUL filter + GetPlayerBuffTexture /
+-- GetPlayerBuffApplications / GetPlayerBuffTimeLeft / CancelPlayerBuff). Nampower's
+-- GetUnitField exposes no duration, and we want a real countdown on our own auras
+-- (+ right-click cancel for buffs); these are direct API calls, not the tooltip
+-- scans CLAUDE.md sec.3 forbids.
 
 HoryUI:RegisterModule("auras", true, function()
   if not HoryUI.np.OK() then return end
@@ -29,6 +30,12 @@ HoryUI:RegisterModule("auras", true, function()
   local P_SIZE, P_PERROW, P_TIMER = 28, 8, 15
   local P_ROWSTEP = P_SIZE + P_TIMER + 3         -- icon + timer + gaps
   local P_COUNT = P_PERROW * 3                   -- 24 (3 rows of 8)
+  -- player debuffs: mid-size icons with a timer line reserved UNDER each cell
+  -- (like the buff bar), up to 16. Bigger than the target rows so our own
+  -- debuffs read at a glance.
+  local PD_SIZE, PD_PERROW, PD_COUNT = 24, 8, 16
+  local PD_TIMER = 13
+  local PD_ROWSTEP = PD_SIZE + PD_TIMER + 3       -- icon + timer + gaps
 
   -- hover tooltips. Player buffs use the Blizzard player-buff id; target auras
   -- use the compacted display index (== UnitBuff/UnitDebuff ordinal), the same
@@ -39,6 +46,12 @@ HoryUI:RegisterModule("auras", true, function()
     if kind == "player" then
       if not this.bidx then return end
       local bid = GetPlayerBuff(BSTART + this.bidx, "HELPFUL")
+      if not bid or bid < 0 then return end
+      GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT")
+      GameTooltip:SetPlayerBuff(bid)
+    elseif kind == "pdebuff" then
+      if not this.bidx then return end
+      local bid = GetPlayerBuff(BSTART + this.bidx, "HARMFUL")
       if not bid or bid < 0 then return end
       GameTooltip:SetOwner(this, "ANCHOR_BOTTOMRIGHT")
       GameTooltip:SetPlayerBuff(bid)
@@ -84,6 +97,11 @@ HoryUI:RegisterModule("auras", true, function()
           CancelPlayerBuff(GetPlayerBuff(BSTART + this.bidx, "HELPFUL"))
         end
       end)
+    elseif kind == "pdebuff" then
+      -- player debuffs: timer line UNDER the icon like the buffs (the panel row
+      -- step reserves the space); readable, our own auras matter at a glance.
+      HoryUI.SetFont(b.timer, HoryUI.font.number, 12, "OUTLINE")
+      b.timer:SetPoint("TOP", b, "BOTTOM", 0, -1)
     else
       -- target auras: countdown overlaid inside the (small) icon to stay compact
       HoryUI.SetFont(b.timer, HoryUI.font.number, 9, "OUTLINE")
@@ -93,7 +111,7 @@ HoryUI:RegisterModule("auras", true, function()
     return b
   end
 
-  local function MakeGroup(name, count, size, perrow, rowstep, kind, bottomUp)
+  local function MakeGroup(name, count, size, perrow, rowstep, kind, bottomUp, rightToLeft)
     local f = CreateFrame("Frame", name, UIParent)
     f:SetWidth(perrow * (size + GAP))
     local totalRows = math.ceil(count / perrow)
@@ -107,13 +125,20 @@ HoryUI:RegisterModule("auras", true, function()
       -- bottomUp groups fill the bottom row first, then grow upward, so the
       -- first slot sits on the lowest row of the (fixed) panel box.
       if bottomUp then row = totalRows - 1 - row end
-      ic:SetPoint("TOPLEFT", f, "TOPLEFT", col * (size + GAP), -row * rowstep)
+      -- rightToLeft groups anchor the first slot at the panel's right edge and
+      -- grow leftward, so new debuffs appear on the right.
+      if rightToLeft then
+        ic:SetPoint("TOPRIGHT", f, "TOPRIGHT", -col * (size + GAP), -row * rowstep)
+      else
+        ic:SetPoint("TOPLEFT", f, "TOPLEFT", col * (size + GAP), -row * rowstep)
+      end
       f.icons[i] = ic
     end
     return f
   end
 
   local pbuffs   = MakeGroup("HoryUIPlayerAuras", P_COUNT, P_SIZE, P_PERROW, P_ROWSTEP, "player")
+  local pdebuffs = MakeGroup("HoryUIPlayerDebuffs", PD_COUNT, PD_SIZE, PD_PERROW, PD_ROWSTEP, "pdebuff", nil, true)
   local tdebuffs = MakeGroup("HoryUITargetDebuffs", 16, T_SIZE, T_PERROW, T_SIZE + GAP, "debuff")
   local tbuffs   = MakeGroup("HoryUITargetBuffs", 16, T_SIZE, T_PERROW, T_SIZE + GAP, "buff", true)
 
@@ -270,6 +295,35 @@ HoryUI:RegisterModule("auras", true, function()
     for j = shown + 1, total do icons[j]:Hide() end
   end
 
+  ----------------------------------------------------------------------------
+  -- player debuffs: same Blizzard player-buff API as the buffs above, but the
+  -- HARMFUL filter -- so we get a real time-left (GetPlayerBuffTimeLeft) + stacks
+  -- for EVERY debuff on us, not only the ones whose application we happened to
+  -- witness via AURA_CAST_ON_SELF (the old Nampower Scan path). No tracking filter
+  -- (a debuff is never a tracking aura) and no right-click cancel (debuffs can't
+  -- be cancelled). Tooltip resolves via SetPlayerBuff (see IconOnEnter, "pdebuff").
+  ----------------------------------------------------------------------------
+  local function ScanPlayerDebuffs(icons)
+    local total = table.getn(icons)
+    local shown = 0
+    local i = 1
+    while shown < total do
+      local bid = GetPlayerBuff(BSTART + i, "HARMFUL")
+      if not bid or bid < 0 then break end       -- debuffs are contiguous from 1
+      shown = shown + 1
+      local ic = icons[shown]
+      ic.bidx = i                                 -- real debuff index (for tooltip)
+      ic.tex:SetTexture(GetPlayerBuffTexture(bid) or "Interface\\Icons\\INV_Misc_QuestionMark")
+      local st = GetPlayerBuffApplications(bid)
+      if st and st > 1 then ic.count:SetText(st) else ic.count:SetText("") end
+      local tl = GetPlayerBuffTimeLeft(bid)
+      if tl and tl > 0 then SetTimer(ic.timer, tl) else ic.timer:SetText("") end
+      ic:Show()
+      i = i + 1
+    end
+    for j = shown + 1, total do icons[j]:Hide() end
+  end
+
   local function Placeholders(icons, n)
     for i = 1, table.getn(icons) do
       if i <= n then
@@ -316,12 +370,14 @@ HoryUI:RegisterModule("auras", true, function()
 
     if HoryUI.showAll then
       Placeholders(pbuffs.icons, 10)
+      Placeholders(pdebuffs.icons, 4)
       Placeholders(tdebuffs.icons, 4)
       Placeholders(tbuffs.icons, 3)
       return
     end
 
     ScanPlayerBuffs(pbuffs.icons)
+    ScanPlayerDebuffs(pdebuffs.icons)
     if UnitExists("target") then
       local tguid = HoryUI.np.GUID("target")
       local track = GetTrackingTexture and GetTrackingTexture()
@@ -334,5 +390,6 @@ HoryUI:RegisterModule("auras", true, function()
   end)
 
   HoryUI.RegisterPanel(pbuffs, "playerauras", "Buffs", "TOPRIGHT", -20, -20)
+  HoryUI.RegisterPanel(pdebuffs, "playerdebuffs", "Debuffs", "TOPRIGHT", -20, -170)
   HoryUI.HideBlizzard(BuffFrame)
 end)

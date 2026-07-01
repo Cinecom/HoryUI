@@ -10,6 +10,18 @@ HoryUI:RegisterModule("castbar", true, function()
   if not HoryUI.np.OK() then return end
   local C = HoryUI.color
 
+  -- Enemy-cast latency compensation. A SPELL_START_OTHER / UNIT_CASTEVENT packet
+  -- reaches us ~one network round-trip after the cast truly began on the server,
+  -- so an uncompensated bar starts (and finishes) late -- the spell lands before
+  -- the bar fills. Shifting the start back by our latency makes the bar reach the
+  -- end at the real last-interruptible moment (a Kick also needs the round-trip to
+  -- arrive, so the full GetNetStats latency is the right amount). Enemy casts only;
+  -- the player's own cast start is known locally and is left uncompensated.
+  local function CastLag()
+    local _, _, lag = GetNetStats()
+    return (lag or 0) / 1000
+  end
+
   -- Object-interaction and visual casts (opening chests/lockboxes, gathering,
   -- pickpocket, NPC visuals) resolve to real spell records, but their names
   -- carry Blizzard's dev-internal markers -- "Opening - No Text", "Heal Visual
@@ -237,7 +249,7 @@ HoryUI:RegisterModule("castbar", true, function()
             Prune()
             casts[caster] = {
               spellId = spellId, name = SpellName(spellId), icon = SpellIcon(spellId),
-              start = GetTime(), duration = dur, channel = channel,
+              start = GetTime() - CastLag(), duration = dur, channel = channel,
             }
             if caster == currentTargetGuid then ShowTargetCast() end
           end
@@ -274,7 +286,7 @@ HoryUI:RegisterModule("castbar", true, function()
           spellId = spellId,
           name = SpellName(spellId),
           icon = SpellIcon(spellId),
-          start = GetTime(),
+          start = GetTime() - CastLag(),
           duration = dur,
           channel = channel,
         }

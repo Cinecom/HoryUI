@@ -397,7 +397,12 @@ HoryUI:RegisterModule("bags", true, function()
       local tex
       if b == 0 then tex = "Interface\\Buttons\\Button-Backpack-Up"
       elseif b == KEYRING then tex = "Interface\\ContainerFrame\\KeyRing-Bag-Icon"
-      else tex = GetInventoryItemTexture("player", ContainerIDToInventoryID(b)) end
+      else
+        -- a bag slot with no bag equipped shows the empty bag-slot art, not a
+        -- backpack -- so it reads as "slot free" instead of a real container.
+        tex = GetInventoryItemTexture("player", ContainerIDToInventoryID(b))
+          or "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+      end
       ib.tex:SetTexture(tex or "Interface\\Buttons\\Button-Backpack-Up")
       if ib.backdrop then ib.backdrop:SetBackdropBorderColor(IconRestColor(b)) end
       ib:Show()

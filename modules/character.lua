@@ -624,6 +624,37 @@ HoryUI:RegisterModule("character", true, function()
     row.bar:SetHeight(3)
     row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", 4, 2)
     row.bar:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 2)
+    -- Unlearn button -- only shown for abandonable skills (professions). Reuses
+    -- the native UNLEARN_SKILL confirmation popup -> AbandonSkill(index).
+    row.unlearn = CreateFrame("Button", nil, row)
+    row.unlearn:SetWidth(14); row.unlearn:SetHeight(14)
+    row.unlearn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -1)
+    local ux = row.unlearn:CreateTexture(nil, "ARTWORK")
+    ux:SetTexture(HoryUI.tex.white)
+    ux:SetAllPoints(row.unlearn)
+    ux:SetVertexColor(C.health_low[1], C.health_low[2], C.health_low[3], 0.28)
+    row.unlearn.bg = ux
+    row.unlearn.x = row.unlearn:CreateFontString(nil, "OVERLAY")
+    HoryUI.SetFont(row.unlearn.x, HoryUI.font.normal, 11, "OUTLINE")
+    row.unlearn.x:SetPoint("CENTER", row.unlearn, "CENTER", 0, 0)
+    row.unlearn.x:SetText("x")
+    row.unlearn.x:SetTextColor(C.health_low[1], C.health_low[2], C.health_low[3])
+    row.unlearn:SetScript("OnEnter", function()
+      this.bg:SetVertexColor(C.health_low[1], C.health_low[2], C.health_low[3], 0.55)
+      GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+      GameTooltip:SetText(UNLEARN_SKILL_TOOLTIP or "Unlearn")
+      GameTooltip:Show()
+    end)
+    row.unlearn:SetScript("OnLeave", function()
+      this.bg:SetVertexColor(C.health_low[1], C.health_low[2], C.health_low[3], 0.28)
+      GameTooltip:Hide()
+    end)
+    row.unlearn:SetScript("OnClick", function()
+      if not this.skillIndex then return end
+      local dialog = StaticPopup_Show("UNLEARN_SKILL", this.skillName)
+      if dialog then dialog.data = this.skillIndex end
+    end)
+    row.unlearn:Hide()
     row:SetScript("OnClick", function()
       local d = skillData[this.dataIndex]
       if d and d.header then
@@ -641,6 +672,7 @@ HoryUI:RegisterModule("character", true, function()
       row.name:SetTextColor(C.accent_hi[1], C.accent_hi[2], C.accent_hi[3])
       row.rank:SetText("")
       row.bar:Hide()
+      row.unlearn:Hide()
     else
       row.name:SetText(d.name or "")
       row.name:SetTextColor(C.text[1], C.text[2], C.text[3])
@@ -652,16 +684,27 @@ HoryUI:RegisterModule("character", true, function()
         row.bar:Hide()
       end
       row.rank:SetTextColor(C.text2[1], C.text2[2], C.text2[3])
+      row.rank:ClearAllPoints()
+      if d.abandonable then
+        row.unlearn.skillIndex = d.index
+        row.unlearn.skillName  = d.name
+        row.unlearn:Show()
+        row.rank:SetPoint("TOPRIGHT", row.unlearn, "TOPLEFT", -6, 0)
+      else
+        row.unlearn:Hide()
+        row.rank:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -1)
+      end
     end
   end
 
   RefreshSkills = function()
     local n = GetNumSkillLines()
     for i = 1, n do
-      local name, header, isExpanded, rank, temp, _, maxRank = GetSkillLineInfo(i)
+      local name, header, isExpanded, rank, temp, _, maxRank, isAbandonable = GetSkillLineInfo(i)
       local d = skillData[i] or {}
       d.name = name; d.header = header; d.expanded = isExpanded
       d.rank = (rank or 0) + (temp or 0); d.max = maxRank; d.index = i
+      d.abandonable = isAbandonable
       skillData[i] = d
     end
     skillScroll.SetTotal(n)

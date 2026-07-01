@@ -2,7 +2,7 @@
 ## Title: HoryUI
 ## Notes: Minimal premium rogue HUD for WoW 1.12 (Garnet)
 ## Author: Horyoshi
-## Version: 0.2.10
+## Version: 0.2.11
 ## SavedVariables: HoryUIDB, BongosProfiles
 ## SavedVariablesPerCharacter: BongosSets, BActionSets, BStanceSets, BContextSets
 
@@ -20,6 +20,7 @@ libs\blizzard.lua
 libs\panels.lua
 libs\widgets.lua
 libs\skin.lua
+data\sellprices.lua
 core\slash.lua
 modules\unitframes.lua
 modules\castbar.lua
@@ -42,6 +43,8 @@ modules\bags.lua
 modules\character.lua
 modules\outfitter.lua
 modules\tooltip.lua
+modules\vendorprice.lua
+modules\selltrash.lua
 
 # --- vendored Bongos action bar engine (standalone; dormant while the standalone
 # Bongos addon is enabled -- see bongos\gate.lua). Order mirrors Bongos.toc:
